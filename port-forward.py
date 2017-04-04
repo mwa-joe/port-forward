@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 
 # Utility to forward ports on your router using UPnP
 # most code from  http://mattscodecave.com/posts/using-python-and-upnp-to-forward-a-port
@@ -7,11 +7,11 @@
 
 import socket
 import re
-from urlparse import urlparse
-import urllib2
+from urllib.parse import urlparse
+import urllib.request, urllib.error, urllib.parse
 from xml.dom.minidom import parseString
 from xml.dom.minidom import Document
-import httplib
+import http.client
 import time
 import argparse
 import sys
@@ -35,7 +35,7 @@ def discover():
 
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.setblocking(0)
-    sock.sendto(ssdpRequest, (SSDP_ADDR, SSDP_PORT))
+    sock.sendto(ssdpRequest.encode(), (SSDP_ADDR, SSDP_PORT))
     time.sleep(WAIT)
     paths = []
     for _ in range(10):
@@ -43,10 +43,10 @@ def discover():
             data, fromaddr = sock.recvfrom(1024)
             ip = fromaddr[0]
             #print "from ip: %s"%ip
-            parsed = re.findall(r'(?P<name>.*?): (?P<value>.*?)\r\n', data)
+            parsed = re.findall(r'(?P<name>.*?): (?P<value>.*?)\r\n', data.decode())
 
             # get the location header
-            location = filter(lambda x: x[0].lower() == "location", parsed)
+            location = [x for x in parsed if x[0].lower() == "location"]
 
             # use the urlparse function to create an easy to use object to hold a URL
             router_path = location[0][1]
@@ -60,7 +60,7 @@ def discover():
 
 def get_wanip_path(upnp_url):
     # get the profile xml file and read it into a variable
-    directory = urllib2.urlopen(upnp_url).read()
+    directory = urllib.request.urlopen(upnp_url).read()
 
     # create a DOM object that represents the `directory` document
     dom = parseString(directory)
@@ -151,7 +151,7 @@ def open_port(service_url,external_port,internal_client,internal_port=None,proto
     pure_xml = doc.toxml()
 
     # use the object returned by urlparse.urlparse to get the hostname and port
-    conn = httplib.HTTPConnection(parsedurl.hostname, parsedurl.port)
+    conn = http.client.HTTPConnection(parsedurl.hostname, parsedurl.port)
 
     # use the path of WANIPConnection (or WANPPPConnection) to target that service,
     # insert the xml payload,
@@ -204,14 +204,14 @@ if __name__=='__main__':
     args = parser.parse_args()
 
     if args.verbose:
-        print "Discovering routers..."
+        print("Discovering routers...")
 
     res = discover()
     if args.verbose or args.eport==None:
-        print "Found %s UPnP routers: "%len(res)," ".join([urlparse(x).netloc for x in res])
+        print("Found %s UPnP routers: "%len(res)," ".join([urlparse(x).netloc for x in res]))
 
     if args.eport==None:
-        print "No external port specified."
+        print("No external port specified.")
         sys.exit(0)
 
     if args.iport == None:
@@ -240,7 +240,7 @@ if __name__=='__main__':
         if status==200:
 
             if args.verbose:
-                print "%sport forward on %s successful, %s->%s:%s"%(dis,routerip,args.eport,localip,args.iport)
+                print("%sport forward on %s successful, %s->%s:%s"%(dis,routerip,args.eport,localip,args.iport))
         else:
             sys.stderr.write("%sport forward on %s failed, status=%s message=%s\n"%(dis,routerip,status,message))
             allok = False
